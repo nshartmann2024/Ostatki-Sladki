@@ -1,0 +1,9 @@
+Updated recipes: 21
+Recipes where 'лук' kept (key ingredient): zwiebelrahmsuppe_v1
+Recipes where 'чеснок' kept (key ingredient): knoblauchsuppe_v1
+
+[лук] kept:
+  zwiebelrahmsuppe_v1: луковый крем-суп
+
+[чеснок] kept:
+  knoblauchsuppe_v1: чесночный суп

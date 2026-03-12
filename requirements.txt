@@ -1,0 +1,2 @@
+streamlit
+aiogram==3.*

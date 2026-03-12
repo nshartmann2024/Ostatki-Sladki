@@ -1,0 +1,3 @@
+# db/app.db — закомментировано для deploy в Streamlit Cloud (база должна быть в репозитории)
+# db/app.db
+.streamlit/secrets.toml

@@ -1,0 +1,37 @@
+recipe_id | title_ru | missing_tags
+--------------------------------------------------------------------------------
+scheiterhaufen_v1 | хлебная запеканка с яблоками | —
+arme_ritter_v1 | сладкие гренки | —
+semmelknoedel_v1 | хлебные кнедли | —
+brotsuppe_rahm_2025 | хлебный суп со сливками | —
+brotsuppe_grudinka_2013 | хлебный суп с грудинкой | —
+brotauflauf_klassisch_v1 | солёная хлебная запеканка (классическая) | —
+brotauflauf_kaese_v1 | хлебная запеканка с сыром | —
+kekse_altes_brot_v1 | печенье из черствого хлеба | —
+erdapfelgulasch_v1 | картофельный гуляш | —
+reisauflauf_v1 | рисовая запеканка | —
+erdaepfelrahmsuppe_v1 | картофельный суп | —
+zwiebelrahmsuppe_v1 | луковый крем-суп | —
+kraut_schinken_fleckerl_v1 | флекерль с капустой и ветчиной | —
+reisfleisch_v1 | рис с мясом | —
+krautsuppe_v1 | капустный суп | —
+schwammerlsuppe_v1 | грибной суп | —
+gefuellte_champignons_v1 | фаршированные шампиньоны | —
+erdaepfel_vogerlsalat_v1 | картофельный салат с маш-салатом | —
+gemuesegulasch_v1 | овощной гуляш | —
+einbrennte_erdaepfel_v1 | картофель в соусе | —
+kirschenmichel_v1 | хлебная запеканка с вишней | —
+kaffeepudding_v1 | пудинг из кофе | —
+ribollita_v1 | хлебный суп с фасолью | —
+kartoffelpueree_puffer_v1 | оладьи из картофельного пюре | —
+bananencreme_v1 | банановый крем | —
+erdaepfelkrapferl_v1 | розетки из остатков пюре | —
+topfenweckerl_v1 | творожные булочки из остатков | —
+topfenauflauf_suess_v1 | запеканка из творога и подсохшего сладкого хл | —
+restltopf_auflauf_v1 | запеканка из мясных и овощных остатков | кабачок, морковь
+knoblauchsuppe_v1 | чесночный суп | —
+kaesesuppe_v1 | сырный суп из остатков | —
+topfenaufstrich_bunt_v1 | разноцветные намазки из творога | —
+
+Рецептов с missing_tags: 1
+Всего рецептов: 32
