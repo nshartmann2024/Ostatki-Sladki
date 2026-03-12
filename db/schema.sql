@@ -55,3 +55,13 @@ CREATE TABLE IF NOT EXISTS franz_usage (
     used_at TEXT,
     PRIMARY KEY (user_key, phrase_id, used_at)
 );
+
+-- Аналитика (минимальная, без внешних сервисов)
+CREATE TABLE IF NOT EXISTS analytics_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_type TEXT NOT NULL,
+    event_value TEXT,
+    channel TEXT NOT NULL,
+    recipe_id TEXT,
+    created_at TEXT NOT NULL
+);

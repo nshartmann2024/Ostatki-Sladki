@@ -29,6 +29,7 @@ from aiogram.enums import ParseMode
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from core.core_engine import handle_event
+from db.analytics import log_event as _log_analytics
 
 # Placeholders to protect <b>/</b> from HTML escaping (single chars unlikely in text)
 _HTML_B_OPEN, _HTML_B_CLOSE = "\x01", "\x02"
@@ -219,6 +220,7 @@ async def on_callback(callback: CallbackQuery):
     else:
         # Выбор рецепта: убрать inline-кнопки у сообщения со списком, чтобы не копились
         if data.startswith("recipe:"):
+            _log_analytics("recipe_open", "telegram", recipe_id=data[7:], db_path=os.path.join(_root, "db", "app.db"))
             try:
                 await callback.message.edit_reply_markup(reply_markup=None)
             except Exception:
