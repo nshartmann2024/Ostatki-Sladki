@@ -312,6 +312,12 @@ if _qp_sitemap and _qp_sitemap.get("sitemap"):
     st.text(_get_sitemap_xml())
     st.stop()
 
+# Google Search Console: meta-тег подтверждения (в начале страницы)
+st.markdown(
+    '<meta name="google-site-verification" content="6lGFlsZQ7gpYxaDj_PJYnwd6FhM-1jYaTBWLKtzdVY4" />',
+    unsafe_allow_html=True,
+)
+
 # CSS: фон, карточка по маркеру, скрыть image toolbar. Поле поиска НЕ ТРОГАЕМ (никаких input/textarea).
 st.markdown("""
 <style>
