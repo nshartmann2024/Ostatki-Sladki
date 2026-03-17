@@ -1,6 +1,10 @@
 """
 Web-адаптер «Остатки сладки»: Streamlit UI.
 Запуск из корня: streamlit run adapters/web/app.py
+
+Project status: поиск по форме, SEO-страницы ?ingredient=..., кнопки ингредиентов, рецепты/фото,
+нормализация (NORMALIZE_WORDS), sitemap ?sitemap=1. URL при поиске может не обновляться (ограничение
+Streamlit) — SEO через прямые ссылки ?ingredient=...; приоритеты: GSC, Яндекс Вебмастер, SEO. См. PROJECT_STATUS_FEB_2026.md.
 """
 import html
 import os
@@ -104,6 +108,88 @@ def _get_recipe_by_id(recipe_id):
             return {"id": row[0], "title_ru": row[1] or "", "photo_url": row[2] or ""}
     except Exception:
         return None
+
+
+def _get_recipe_card_info(recipe_id):
+    """Вернуть dict с id, title_ru, photo_url, short_desc для карточки SEO-страницы."""
+    db_path = os.path.join(_root, "db", "app.db")
+    if not os.path.isfile(db_path):
+        return None
+    try:
+        with sqlite3.connect(db_path) as conn:
+            cur = conn.execute(
+                "SELECT id, title_ru, photo_url, short_desc FROM recipes WHERE id = ?",
+                (recipe_id,),
+            )
+            row = cur.fetchone()
+            if not row:
+                return None
+            return {"id": row[0], "title_ru": row[1] or "", "photo_url": row[2] or "", "short_desc": row[3] or ""}
+    except Exception:
+        return None
+
+
+# SEO-страницы ингредиентов: нормализованный ключ -> (форма для H1 "из ...", текст под H1)
+SEO_INGREDIENTS = {
+    "картофель": (
+        "картофеля",
+        "В домашней венской кухне из картофеля готовят кнедли, салаты, гуляш, запеканки и другие простые блюда на каждый день.\n\nНиже — рецепты из картофеля и других простых продуктов, которые обычно есть на кухне.",
+    ),
+    "хлеб": (
+        "хлеба",
+        "В домашней венской кухне из хлеба готовят супы, кнедли, запеканки и сладкие блюда.\n\nНиже — рецепты из хлеба и других простых продуктов, которые обычно есть на кухне.",
+    ),
+    "творог": (
+        "творога",
+        "В домашней венской кухне из творога готовят намазки, десерты, кремы и сладкие запеканки.\n\nНиже — рецепты из творога и других простых продуктов, которые обычно есть на кухне.",
+    ),
+    "сыр": (
+        "сыра",
+        "В домашней венской кухне сыр добавляют в запеканки, супы, кнедли и быстрые горячие блюда.\n\nНиже — рецепты с сыром и другими простыми продуктами, которые обычно есть на кухне.",
+    ),
+    "яблоко": (
+        "яблок",
+        "В домашней венской кухне из яблок готовят запеканки, десерты и другие простые сладкие блюда.\n\nНиже — рецепты из яблок и других простых продуктов, которые обычно есть на кухне.",
+    ),
+    "банан": (
+        "бананов",
+        "Из бананов в домашней кухне готовят быстрые десерты, кремы и сладкие запеканки.\n\nНиже — простые рецепты из бананов и других продуктов, которые обычно есть дома.",
+    ),
+    "рис": (
+        "риса",
+        "В домашней венской кухне из риса готовят супы, запеканки и гарниры.\n\nНиже — рецепты с рисом и другими простыми продуктами, которые обычно есть на кухне.",
+    ),
+}
+
+# Кнопки «Что приготовить из…»: надпись на кнопке -> значение для URL ?ingredient=
+INGREDIENT_BUTTON_TO_SLUG = {
+    "Творог": "творог",
+    "Сыр": "сыр",
+    "Бананы": "банан",
+    "Рис": "рис",
+    "Яблоки": "яблоко",
+    "Картофель": "картофель",
+    "Хлеб": "хлеб",
+}
+
+# Sitemap: базовый URL (для SEO). В Cloud задать через Secrets: SITEMAP_BASE_URL
+SITEMAP_BASE_URL = os.environ.get("SITEMAP_BASE_URL", "https://your-app.streamlit.app").rstrip("/")
+# Только ингредиенты с рабочими SEO-страницами (лук и чеснок не дают отдельную SEO-страницу)
+SITEMAP_INGREDIENTS = sorted(SEO_INGREDIENTS.keys())
+
+
+def _get_sitemap_xml(base_url: str | None = None) -> str:
+    """Формирует sitemap.xml: главная + страницы ?ingredient=<slug>."""
+    base = (base_url or SITEMAP_BASE_URL).rstrip("/")
+    lines = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+        f"  <url><loc>{base}/</loc></url>",
+    ]
+    for slug in SITEMAP_INGREDIENTS:
+        lines.append(f'  <url><loc>{base}/?ingredient={html.escape(slug)}</loc></url>')
+    lines.append("</urlset>")
+    return "\n".join(lines)
 
 
 def _strip_html(text):
@@ -211,7 +297,20 @@ def _dict_to_response(d):
     })()
 
 
-st.set_page_config(page_title="Остатки Сладки", layout="centered")
+st.set_page_config(page_title="Остатки Сладки — рецепты из простых продуктов", layout="centered")
+
+# Sitemap: при ?sitemap=1 или ?sitemap=xml возвращаем только XML (без основного UI)
+_qp_sitemap = getattr(st, "query_params", None)
+if _qp_sitemap is None and hasattr(st, "experimental_get_query_params"):
+    _qp_sitemap = st.experimental_get_query_params() or {}
+if _qp_sitemap and _qp_sitemap.get("sitemap"):
+    st.markdown(
+        "<style>header, section[data-testid='stSidebar'], footer, .stDeployButton { display: none !important; }"
+        " [data-testid='stAppViewContainer'] { padding: 0 !important; max-width: 100% !important; }</style>",
+        unsafe_allow_html=True,
+    )
+    st.text(_get_sitemap_xml())
+    st.stop()
 
 # CSS: фон, карточка по маркеру, скрыть image toolbar. Поле поиска НЕ ТРОГАЕМ (никаких input/textarea).
 st.markdown("""
@@ -318,13 +417,76 @@ if "pending_recipe_id" not in st.session_state:
     st.session_state["pending_recipe_id"] = None
 if "scroll_to_results" not in st.session_state:
     st.session_state["scroll_to_results"] = False
+if "exit_seo_params_sent" not in st.session_state:
+    st.session_state["exit_seo_params_sent"] = False
 
 response = _dict_to_response(st.session_state.get("last_response"))
 ui_mode = response.ui_mode if response else "search"
 
-# Псевдо-submit по клику «популярный ингредиент» или рецепт в сайдбаре
+# URL ?ingredient=... — SEO-страница ингредиента (только для разрешённых)
+_qp = getattr(st, "query_params", None)
+if _qp is None and hasattr(st, "experimental_get_query_params"):
+    _qp = st.experimental_get_query_params() or {}
+if _qp is None:
+    _qp = {}
+_ing_val = _qp.get("ingredient") if hasattr(_qp, "get") else None
+if isinstance(_ing_val, list):
+    _ing_val = _ing_val[0] if _ing_val else None
+_query_ingredient = (str(_ing_val or "").strip().lower())
+if _query_ingredient and _query_ingredient in NORMALIZE_WORDS:
+    _query_ingredient = NORMALIZE_WORDS[_query_ingredient]
+_seo_ingredient = _query_ingredient if _query_ingredient in SEO_INGREDIENTS else None
+# Выход из SEO-режима: show_seo_page = False; set_query_params вызываем только один раз за выход, чтобы не дёргать лишние run
+if st.session_state.get("exit_seo_mode"):
+    show_seo_page = False
+    if not st.session_state.get("exit_seo_params_sent"):
+        _params = {k: v for k, v in (_qp.items() if hasattr(_qp, "items") else []) if k != "ingredient"}
+        try:
+            st.experimental_set_query_params(**_params)
+        except Exception:
+            pass
+        st.session_state["exit_seo_params_sent"] = True
+    # Сбросить флаги только когда ingredient реально исчез из URL
+    if not _query_ingredient:
+        st.session_state.pop("exit_seo_mode", None)
+        st.session_state.pop("exit_seo_params_sent", None)
+        st.session_state.pop("force_results_mode", None)
+else:
+    # При поиске URL синхронизирован с ингредиентом — показываем список результатов, а не SEO-страницу
+    show_seo_page = False if st.session_state.get("force_results_mode") else (_seo_ingredient is not None and ui_mode != "recipe")
+
+# В run, где рендерятся результаты поиска: один раз подставить URL под last_search_query (чтобы ответ с контентом содержал обновление URL)
+if st.session_state.get("force_results_mode") and st.session_state.get("last_search_query"):
+    _sync_q = (st.session_state.get("last_search_query") or "").strip()
+    if _sync_q and _query_ingredient != _sync_q:
+        try:
+            st.experimental_set_query_params(ingredient=_sync_q)
+        except Exception:
+            pass
+
+# Динамический title страницы по текущему режиму
+if ui_mode == "recipe":
+    _recipe_id = (st.session_state.get("state") or {}).get("last_recipe_id")
+    _recipe = _get_recipe_by_id(_recipe_id) if _recipe_id else None
+    _title_ru = (_recipe.get("title_ru") or "").strip() if _recipe else ""
+    _page_title = f"{_title_ru} — Остатки Сладки" if _title_ru else "Остатки Сладки — рецепты из простых продуктов"
+elif show_seo_page and _seo_ingredient:
+    _h1_form = SEO_INGREDIENTS[_seo_ingredient][0]
+    _page_title = f"Что приготовить из {_h1_form} — Остатки Сладки"
+elif ui_mode == "results" and response and (response.actions or response.messages) and st.session_state.get("last_search_query"):
+    _q = (st.session_state.get("last_search_query") or "").strip()
+    _q_display = (_q[0].upper() + _q[1:]) if len(_q) > 1 else _q.upper() if _q else ""
+    _page_title = f"Рецепты из {_q_display} — Остатки Сладки" if _q_display else "Остатки Сладки — рецепты из простых продуктов"
+else:
+    _page_title = "Остатки Сладки — рецепты из простых продуктов"
+try:
+    st.set_page_config(page_title=_page_title, layout="centered")
+except Exception:
+    pass
+
+# Псевдо-submit по клику «популярный ингредиент» или рецепт в сайдбаре (не при показе SEO-страницы из URL)
 pending = st.session_state.get("pending_query")
-if pending is not None and pending != "":
+if pending is not None and pending != "" and not show_seo_page:
     st.session_state["pending_query"] = None
     st.session_state["scroll_to_results"] = True
     query = (pending or "").lower().strip()
@@ -340,19 +502,21 @@ if pending is not None and pending != "":
     _log_analytics("ingredient_click", "web", event_value=pending or "", db_path=_ANALYTICS_DB)
     st.session_state["state"] = {**st.session_state["state"], **resp.state_patch}
     st.session_state["last_response"] = _response_to_dict(resp)
+    st.session_state["last_search_query"] = query
     st.rerun()
-rid = st.session_state.get("pending_recipe_id")
-if rid is not None:
+recipe_rid = st.session_state.get("pending_recipe_id")
+if recipe_rid is not None:
     st.session_state["pending_recipe_id"] = None
+    st.session_state.pop("force_results_mode", None)
     resp = handle_event({
         "user_key": "web:local",
         "channel": "web",
         "text_input": "",
-        "action_id": f"recipe:{rid}",
+        "action_id": f"recipe:{recipe_rid}",
         "state": st.session_state.get("state"),
     })
-    r_info = _get_recipe_by_id(rid)
-    _log_analytics("recipe_open", "web", recipe_id=rid, event_value=(r_info.get("title_ru") or "")[:200] if r_info else None, db_path=_ANALYTICS_DB)
+    r_info = _get_recipe_by_id(recipe_rid)
+    _log_analytics("recipe_open", "web", recipe_id=recipe_rid, event_value=(r_info.get("title_ru") or "")[:200] if r_info else None, db_path=_ANALYTICS_DB)
     st.session_state["state"] = {**st.session_state["state"], **resp.state_patch}
     st.session_state["last_response"] = _response_to_dict(resp)
     st.rerun()
@@ -381,19 +545,60 @@ for rid in SIDEBAR_QUICK_IDS:
 if ui_mode == "recipe":
     st.title("Остатки сладки")
 
-# Hero и лендинг только на главной
+# Hero и лендинг только на главной; при ?ingredient=... — SEO-блок вместо hero
 if ui_mode in ("search", "results"):
     st.title("Остатки сладки")
-    st.markdown("Что приготовить быстро и просто из того, что есть дома — в стиле венской домашней кухни.")
-    st.write('Наберите «творог» — получите подборку вариантов.')
-    st.write('Наберите «рис» — идеи ужина из простых продуктов.')
+    if show_seo_page and _seo_ingredient:
+        h1_form, seo_text = SEO_INGREDIENTS[_seo_ingredient]
+        st.markdown(f"## Что приготовить из {h1_form}")
+        for paragraph in (seo_text or "").split("\n\n"):
+            if paragraph.strip():
+                st.write(paragraph.strip())
+        # Получить рецепты по ингредиенту (текущая механика поиска)
+        _seo_resp = handle_event({
+            "user_key": "web:local",
+            "channel": "web",
+            "text_input": _seo_ingredient,
+            "action_id": None,
+            "state": st.session_state.get("state"),
+        })
+        _recipe_actions = [a for a in (_seo_resp.actions or []) if a.id.startswith("recipe:")]
+        _show_ids = [a.id.replace("recipe:", "", 1) for a in _recipe_actions[:3]]
+        _has_more = len(_recipe_actions) > 3
+        for _rid in _show_ids:
+            _card = _get_recipe_card_info(_rid)
+            if not _card:
+                continue
+            _photo_path = resolve_photo_path(_card["id"])
+            if _photo_path:
+                st.image(_photo_path, width="stretch")
+            st.subheader(_card["title_ru"] or _card["id"])
+            _hint = (_card.get("short_desc") or "").strip()
+            if _hint:
+                _hint = (_hint[:100] + "…") if len(_hint) > 100 else _hint
+                st.caption(_hint)
+            if st.button("Открыть рецепт", key="seo_card_" + _card["id"]):
+                st.session_state["pending_recipe_id"] = _card["id"]
+                st.rerun()
+        if _has_more and _recipe_actions:
+            _h1_form = SEO_INGREDIENTS[_seo_ingredient][0]
+            if st.button(f"Показать ещё рецепты из {_h1_form}"):
+                st.session_state["pending_query"] = _seo_ingredient
+                st.session_state["scroll_to_results"] = True
+                # При rerun URL не обновляется — выходим из SEO по флагу, URL почистим в следующем run
+                st.session_state["exit_seo_mode"] = True
+                st.rerun()
+    else:
+        st.markdown("Что приготовить быстро и просто из того, что есть дома — в стиле венской домашней кухни.")
+        st.write('Наберите «творог» — получите подборку вариантов.')
+        st.write('Наберите «рис» — идеи ужина из простых продуктов.')
 
-    # Одно фото: картофельный салат с маш-салатом
-    hero_path = os.path.join(_root, _HERO_PHOTO)
-    if not os.path.isfile(hero_path):
-        hero_path = os.path.join(_root, "assets/photos/erdaepfel-vogel salat.jpg")
-    if os.path.isfile(hero_path):
-        st.image(hero_path, width="stretch")
+        # Одно фото: картофельный салат с маш-салатом
+        hero_path = os.path.join(_root, _HERO_PHOTO)
+        if not os.path.isfile(hero_path):
+            hero_path = os.path.join(_root, "assets/photos/erdaepfel-vogel salat.jpg")
+        if os.path.isfile(hero_path):
+            st.image(hero_path, width="stretch")
 
 action_clicked_id = None
 # Поиск — сразу под hero (без стилей, дефолтный Streamlit)
@@ -418,56 +623,72 @@ if ui_mode in ("search", "results"):
         _log_analytics("search_submit", "web", event_value=raw_query or "", db_path=_ANALYTICS_DB)
         st.session_state["state"] = {**st.session_state["state"], **resp.state_patch}
         st.session_state["last_response"] = _response_to_dict(resp)
+        st.session_state["last_search_query"] = query
+        # Не вызываем set_query_params здесь — rerun() обрежет ответ, URL не дойдёт до браузера
+        st.session_state["force_results_mode"] = True
         st.rerun()
 
-    # Якорь результатов — сразу под поиском
-    st.markdown('<div id="results"></div>', unsafe_allow_html=True)
-    results_anchor = st.empty()
-    with results_anchor.container():
-        if response and response.messages:
-            _skip = lambda m: (m.text or "").strip().startswith("Я понял:") or (m.text or "").strip() == "Можно из этого."
-            _filtered = [m for m in response.messages if not _skip(m)]
-            if ui_mode == "recipe":
-                recipe_id = (st.session_state.get("state") or {}).get("last_recipe_id")
-                photo_path = resolve_photo_path(recipe_id) if recipe_id else None
-                recipe_msgs = _filtered[:-1] if len(_filtered) > 1 else _filtered
-                phrase_msg = _filtered[-1] if len(_filtered) > 1 else None
-                if not recipe_msgs:
-                    recipe_msgs = _filtered
-                    phrase_msg = None
-                st.markdown('<span id="os-recipe-card-marker"></span>', unsafe_allow_html=True)
-                if photo_path:
-                    st.image(photo_path, width="stretch")
-                _render_recipe_card(recipe_msgs)
-                if phrase_msg:
-                    st.markdown(_strip_html(phrase_msg.text))
-            else:
-                for msg in _filtered:
-                    st.markdown(_strip_html(msg.text))
-        if response and response.actions:
-            for action in response.actions:
-                if ui_mode == "recipe" and action.id.startswith("recipe:"):
-                    continue
-                if action.id == "ozvuchit" or ("озвуч" in (action.label or "").lower()):
-                    continue
-                if st.button(action.label, key=action.id):
-                    action_clicked_id = action.id
-                    break
-        if st.session_state.get("scroll_to_results") and response and response.messages:
-            st.session_state["scroll_to_results"] = False
-            st.markdown(
-                '<script>document.getElementById("results").scrollIntoView({behavior:"smooth"});</script>',
-                unsafe_allow_html=True,
-            )
+    # Якорь результатов — только когда НЕ SEO-страница (на SEO не рендерим этот блок, чтобы не смешивать и не утяжелять)
+    if not show_seo_page:
+        st.markdown('<div id="results"></div>', unsafe_allow_html=True)
+        results_anchor = st.empty()
+        with results_anchor.container():
+            if response and response.messages:
+                _skip = lambda m: (m.text or "").strip().startswith("Я понял:") or (m.text or "").strip() == "Можно из этого."
+                _filtered = [m for m in response.messages if not _skip(m)]
+                if ui_mode == "recipe":
+                    recipe_id = (st.session_state.get("state") or {}).get("last_recipe_id")
+                    photo_path = resolve_photo_path(recipe_id) if recipe_id else None
+                    recipe_msgs = _filtered[:-1] if len(_filtered) > 1 else _filtered
+                    phrase_msg = _filtered[-1] if len(_filtered) > 1 else None
+                    if not recipe_msgs:
+                        recipe_msgs = _filtered
+                        phrase_msg = None
+                    st.markdown('<span id="os-recipe-card-marker"></span>', unsafe_allow_html=True)
+                    if photo_path:
+                        st.image(photo_path, width="stretch")
+                    _render_recipe_card(recipe_msgs)
+                    if phrase_msg:
+                        st.markdown(_strip_html(phrase_msg.text))
+                else:
+                    for msg in _filtered:
+                        st.markdown(_strip_html(msg.text))
+            if response and response.actions:
+                for action in response.actions:
+                    if ui_mode == "recipe" and action.id.startswith("recipe:"):
+                        continue
+                    if action.id == "ozvuchit" or ("озвуч" in (action.label or "").lower()):
+                        continue
+                    if st.button(action.label, key=action.id):
+                        action_clicked_id = action.id
+                        break
+            if st.session_state.get("scroll_to_results") and response and response.messages:
+                st.session_state["scroll_to_results"] = False
+                st.markdown(
+                    '<script>document.getElementById("results").scrollIntoView({behavior:"smooth"});</script>',
+                    unsafe_allow_html=True,
+                )
 
-    # «Что приготовить из…» + кнопки ингредиентов (7 в один ряд, колонка Картофель шире)
+    # «Что приготовить из…» — по клику открываем SEO-страницу ингредиента: URL + контент в sync
     st.subheader("Что приготовить из…")
     st.markdown('<div data-ui="ingredients-row"></div>', unsafe_allow_html=True)
     cols = st.columns([1.0, 1.0, 1.0, 1.0, 1.0, 1.35, 1.0])
     for i, ing in enumerate(POPULAR_INGREDIENTS):
         with cols[i]:
+            _slug = INGREDIENT_BUTTON_TO_SLUG.get(ing, ing.lower())
             if st.button(ing, key="pop_" + ing):
-                st.session_state["pending_query"] = ing.lower()
+                # Сбросить старый контент и режим рецепта, чтобы контент строился только из URL ?ingredient=...
+                st.session_state["last_response"] = None
+                st.session_state["state"] = {}
+                st.session_state.pop("exit_seo_mode", None)
+                st.session_state.pop("exit_seo_params_sent", None)
+                st.session_state.pop("force_results_mode", None)
+                try:
+                    st.experimental_set_query_params(ingredient=_slug)
+                except Exception:
+                    _qp = getattr(st, "query_params", None)
+                    if _qp is not None and hasattr(_qp, "__setitem__"):
+                        _qp["ingredient"] = _slug
                 st.rerun()
 
     # Telegram CTA
@@ -487,30 +708,18 @@ if ui_mode in ("search", "results"):
 
             """
         )
-        if st.session_state.get("telegram_expander_link_shown"):
-            st.link_button(
-                "Открыть рецепты в Telegram",
-                "https://t.me/+2oxmJaqm9BZhYWU0",
-                width="content"
-            )
-        elif st.button("Открыть рецепты в Telegram", key="tg_exp_btn"):
-            _log_analytics("telegram_click", "web", event_value="expander_link", db_path=_ANALYTICS_DB)
-            st.session_state["telegram_expander_link_shown"] = True
-            st.rerun()
-    if st.session_state.get("telegram_main_link_shown"):
-        st.markdown(
-            '<span style="display:inline-flex;align-items:center;gap:8px;">'
-            '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="#0088cc">'
-            '<path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>'
-            '</svg>'
-            '<a href="https://t.me/+2oxmJaqm9BZhYWU0" target="_blank" rel="noopener" style="color:#0088cc;">Перейти в Telegram</a>'
-            '</span>',
-            unsafe_allow_html=True,
+        # Прямой переход в Telegram без промежуточного шага
+        st.link_button(
+            "Открыть рецепты в Telegram",
+            "https://t.me/+2oxmJaqm9BZhYWU0",
+            width="content"
         )
-    elif st.button("Перейти в Telegram", key="tg_main_btn"):
-        _log_analytics("telegram_click", "web", event_value="main_link", db_path=_ANALYTICS_DB)
-        st.session_state["telegram_main_link_shown"] = True
-        st.rerun()
+    # Прямой переход в Telegram (без кнопки «показать ссылку» и rerun)
+    st.link_button(
+        "Перейти в Telegram ✈",
+        "https://t.me/+2oxmJaqm9BZhYWU0",
+        width="content"
+    )
 
     # Хранение: 3 карточки в ряд + 4 по кнопке
     st.subheader("Как хранить продукты в домашних условиях")
