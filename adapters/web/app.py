@@ -332,6 +332,22 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# Google Analytics (GA4): выполняется при загрузке приложения
+_GA4_ID = "G-H4JKDMEFH7"
+st.components.v1.html(
+    f"""
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id={_GA4_ID}"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){{dataLayer.push(arguments);}}
+      gtag('js', new Date());
+      gtag('config', '{_GA4_ID}');
+    </script>
+    """,
+    height=0,
+)
+
 # CSS: фон, карточка по маркеру, скрыть image toolbar. Поле поиска НЕ ТРОГАЕМ (никаких input/textarea).
 st.markdown("""
 <style>
