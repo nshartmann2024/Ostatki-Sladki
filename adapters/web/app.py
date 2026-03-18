@@ -299,11 +299,25 @@ def _dict_to_response(d):
 
 st.set_page_config(page_title="Остатки Сладки — рецепты из простых продуктов", layout="centered")
 
-# Sitemap: при ?sitemap=1 или ?sitemap=xml возвращаем только XML (без основного UI)
+# Query params для специальных режимов (sitemap, verify)
 _qp_sitemap = getattr(st, "query_params", None)
 if _qp_sitemap is None and hasattr(st, "experimental_get_query_params"):
     _qp_sitemap = st.experimental_get_query_params() or {}
-if _qp_sitemap and _qp_sitemap.get("sitemap"):
+if _qp_sitemap is None:
+    _qp_sitemap = {}
+
+# Google Search Console: проверка по ?verify=google — только текст для верификации
+if _qp_sitemap.get("verify") == "google":
+    st.markdown(
+        "<style>header, section[data-testid='stSidebar'], footer, .stDeployButton { display: none !important; }"
+        " [data-testid='stAppViewContainer'] { padding: 0 !important; max-width: 100% !important; }</style>",
+        unsafe_allow_html=True,
+    )
+    st.text("google-site-verification: google8d0c387e6f5870ab.html")
+    st.stop()
+
+# Sitemap: при ?sitemap=1 или ?sitemap=xml возвращаем только XML (без основного UI)
+if _qp_sitemap.get("sitemap"):
     st.markdown(
         "<style>header, section[data-testid='stSidebar'], footer, .stDeployButton { display: none !important; }"
         " [data-testid='stAppViewContainer'] { padding: 0 !important; max-width: 100% !important; }</style>",
