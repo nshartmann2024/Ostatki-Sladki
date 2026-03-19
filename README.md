@@ -27,6 +27,14 @@ https://ostatki-sladki.streamlit.app👉
 
 ---
 
+## 🔎 Примеры страниц:
+
+https://ostatki-sladki.streamlit.app/?ingredient=хлеб
+https://ostatki-sladki.streamlit.app/?ingredient=картофель
+https://ostatki-sladki.streamlit.app/?ingredient=творог
+
+---
+
 ## 🥖 Примеры запросов
 
 - что приготовить из хлеба
@@ -46,6 +54,11 @@ https://ostatki-sladki.streamlit.app👉
 - `adapters/web` — Streamlit сайт
 
 Один core → несколько интерфейсов.
+
+---
+
+## 📄 Sitemap:
+https://ostatki-sladki.streamlit.app/?sitemap=1
 
 ---
 
