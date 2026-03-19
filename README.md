@@ -86,7 +86,7 @@ SEO-страницы поддерживаются через `?ingredient=...`, 
 
 ```bash
 streamlit run adapters/web/app.py
-
+```
 ## 🌐 Онлайн доступ
 
 Сайт: https://ostatki-sladki.streamlit.app
