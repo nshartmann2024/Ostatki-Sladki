@@ -159,7 +159,14 @@ SEO_INGREDIENTS = {
         "риса",
         "В домашней венской кухне из риса готовят супы, запеканки и гарниры.\n\nНиже — рецепты с рисом и другими простыми продуктами, которые обычно есть на кухне.",
     ),
+    "картофель-быстро": (
+        "картошки быстро",
+        "Подборка быстрых рецептов из картошки: простые блюда из доступных продуктов, которые можно приготовить за короткое время.",
+    ),
 }
+
+# Для SEO-ингредиентов, у которых поиск идёт по другому каноническому slug (например картофель-быстро → картофель)
+SEO_INGREDIENT_TO_SEARCH_QUERY = {"картофель-быстро": "картофель"}
 
 # Кнопки «Что приготовить из…»: надпись на кнопке -> значение для URL ?ingredient=
 INGREDIENT_BUTTON_TO_SLUG = {
@@ -299,22 +306,12 @@ def _dict_to_response(d):
 
 st.set_page_config(page_title="Остатки Сладки — рецепты из простых продуктов", layout="centered")
 
-# Query params для специальных режимов (sitemap, verify)
+# Query params для специальных режимов (sitemap)
 _qp_sitemap = getattr(st, "query_params", None)
 if _qp_sitemap is None and hasattr(st, "experimental_get_query_params"):
     _qp_sitemap = st.experimental_get_query_params() or {}
 if _qp_sitemap is None:
     _qp_sitemap = {}
-
-# Google Search Console: проверка по ?verify=google — только текст для верификации
-if _qp_sitemap.get("verify") == "google":
-    st.markdown(
-        "<style>header, section[data-testid='stSidebar'], footer, .stDeployButton { display: none !important; }"
-        " [data-testid='stAppViewContainer'] { padding: 0 !important; max-width: 100% !important; }</style>",
-        unsafe_allow_html=True,
-    )
-    st.text("google-site-verification: google8d0c387e6f5870ab.html")
-    st.stop()
 
 # Sitemap: при ?sitemap=1 или ?sitemap=xml возвращаем только XML (без основного UI)
 if _qp_sitemap.get("sitemap"):
@@ -325,12 +322,6 @@ if _qp_sitemap.get("sitemap"):
     )
     st.text(_get_sitemap_xml())
     st.stop()
-
-# Google Search Console: meta-тег подтверждения (в начале страницы)
-st.markdown(
-    '<meta name="google-site-verification" content="6lGFlsZQ7gpYxaDj_PJYnwd6FhM-1jYaTBWLKtzdVY4" />',
-    unsafe_allow_html=True,
-)
 
 # Google Analytics (GA4): выполняется при загрузке приложения
 _GA4_ID = "G-H4JKDMEFH7"
@@ -528,6 +519,8 @@ if pending is not None and pending != "" and not show_seo_page:
     query = (pending or "").lower().strip()
     if query in NORMALIZE_WORDS:
         query = NORMALIZE_WORDS[query]
+    if query in SEO_INGREDIENT_TO_SEARCH_QUERY:
+        query = SEO_INGREDIENT_TO_SEARCH_QUERY[query]
     resp = handle_event({
         "user_key": "web:local",
         "channel": "web",
@@ -591,10 +584,11 @@ if ui_mode in ("search", "results"):
             if paragraph.strip():
                 st.write(paragraph.strip())
         # Получить рецепты по ингредиенту (текущая механика поиска)
+        _seo_query = SEO_INGREDIENT_TO_SEARCH_QUERY.get(_seo_ingredient, _seo_ingredient)
         _seo_resp = handle_event({
             "user_key": "web:local",
             "channel": "web",
-            "text_input": _seo_ingredient,
+            "text_input": _seo_query,
             "action_id": None,
             "state": st.session_state.get("state"),
         })
